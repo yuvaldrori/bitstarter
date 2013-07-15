@@ -24,6 +24,7 @@ References:
 var fs = require('fs');
 var program = require('commander');
 var cheerio = require('cheerio');
+var rest = require('restler');
 var HTMLFILE_DEFAULT = "index.html";
 var CHECKSFILE_DEFAULT = "checks.json";
 
@@ -44,8 +45,7 @@ var loadChecks = function(checksfile) {
   return JSON.parse(fs.readFileSync(checksfile));
 };
 
-var checkHtmlFile = function(htmlfile, checksfile) {
-  $ = cheerioHtmlFile(htmlfile);
+var checkHtml = function($, checksfile) {
   var checks = loadChecks(checksfile).sort();
   var out = {};
   for(var ii in checks) {
@@ -65,11 +65,24 @@ if(require.main == module) {
   program
   .option('-c, --checks <check_file>', 'Path to checks.json', clone(assertFileExists), CHECKSFILE_DEFAULT)
   .option('-f, --file <html_file>', 'Path to index.html', clone(assertFileExists), HTMLFILE_DEFAULT)
+  .option('-u, --url <url>', 'url to check')
   .parse(process.argv);
-  var checkJson = checkHtmlFile(program.file, program.checks);
-  var outJson = JSON.stringify(checkJson, null, 4);
-  console.log(outJson);
+  if (program.file && !program.url) {
+    console.log(JSON.stringify(
+      checkHtml(cheerioHtmlFile(program.file), program.checks), null, 4));
+  };
+  if (program.url) {
+    rest.get(program.url).on('complete', function(result, response) {
+      if (result instanceof Error) {                                          
+        console.log("Could not get url\n");
+        process.exit(1);
+      } else {
+        console.log(JSON.stringify(
+          checkHtml(cheerio.load(result), program.checks), null, 4));
+      } 
+    });
+  };
 } else {
-  exports.checkHtmlFile = checkHtmlFile;
+  exports.checkHtmlFile = checkHtml;
 }
 
